@@ -1,2 +1,3 @@
 # Tarnish
-Tarnish - A language with only one keyword, designed to inline many different languages into one.
+Tarnish - A language with only one keyword: macro.
+Designed to inline many different languages into one.
