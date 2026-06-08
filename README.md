@@ -1,2 +1,2 @@
-# llvmpp
-LLVM++ - LLVM with a macro ecosystem that provides high level language functionality.
+# Tarnish
+Tarnish - A language with only one keyword, designed to inline many different languages into one.
