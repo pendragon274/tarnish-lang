@@ -1,0 +1,73 @@
+use std::error::Error;
+use std::fmt::{Debug, Display, Formatter};
+
+pub struct CompileError{
+    errors: Vec<FileCompileError>
+}
+
+pub struct FileCompileError{
+    line: u64,
+    file: String,
+    message: String,
+    code: u8
+}
+
+
+impl Debug for CompileError {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "\nCompilation contained errors:\n")?;
+
+        for error in &self.errors {
+            write!(f, "{:?}", error)?;
+        }
+
+        write!(f, "\n")
+    }
+}
+
+impl Debug for FileCompileError {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "File {}, Code {}, Line {}: {}", self.file, self.code, self.line, self.message)
+    }
+}
+
+impl Display for CompileError{
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "\nCompilation contained errors:\n")?;
+
+        for error in &self.errors {
+            write!(f, "{}", error)?;
+        }
+
+        write!(f, "\n")
+    }
+}
+
+impl Display for FileCompileError {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "File {}, Line {}: {}", self.file, self.line, self.message)
+    }
+}
+
+impl Error for CompileError{}
+impl Error for FileCompileError{}
+
+impl CompileError{
+    pub fn code(&self) -> u8{
+        self.errors.len() as u8
+    }
+
+    pub fn new(errors: Vec<FileCompileError>)->CompileError{
+        CompileError{ errors }
+    }
+}
+
+impl FileCompileError {
+    pub fn code(&self) -> u8 {
+        self.code
+    }
+
+    pub fn new(line: u64, file: String, message: String, code: u8) -> FileCompileError{
+        FileCompileError{ line, file, message, code }
+    }
+}

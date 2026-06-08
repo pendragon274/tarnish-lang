@@ -1,11 +1,12 @@
-mod token;
-mod symbol_table;
+use {
+    std::{
+        env,
+        io,
+        io::BufRead,
+        process::ExitCode},
+    tarnishlang::TarnishCompiler};
 
-use std::{env, fs};
-use std::process::{exit, Command};
-use crate::token::Token;
-use crate::symbol_table::SymbolTable;
-
+/*
 enum InterpretationResult{
     Ok(String),
     Incomplete,
@@ -13,6 +14,7 @@ enum InterpretationResult{
 }
 
 use InterpretationResult::*;
+use crate::tarnish_compiler::TarnishCompiler;
 
 fn convert_input_name_to_ll(name: &str) -> String {
     let found_delimiter = name.find(".");
@@ -79,17 +81,34 @@ fn interpret_line(line: &str, symbols: &mut SymbolTable, carry: &mut Vec<Token>)
     }else{
         execute_macro(symbols, carry)
     }
-}
+}*/
 
-fn main() {
-    let args: Vec<String> = env::args().skip(1).collect::<Vec<String>>();
-    if args.len() < 1 {
-        println!("Please enter a filename.");
-        return;
+fn main() -> ExitCode {
+    let mut file_names: Vec<String> = env::args().skip(1).collect::<Vec<String>>();
+    if file_names.len() < 1 {
+        println!("Please enter a filename:");
+        let stdin = io::stdin();
+        let mut done = false;
+        while !done{
+            let file = stdin.lock().lines().next().unwrap().unwrap();
+            if file != String::from("") {
+                file_names.push(file);
+            }else {
+                done = true;
+            }
+        }
     }
 
-    let file_name = &args[0];
-    let file_ll_name = convert_input_name_to_ll(&file_name);
+    let mut compiler = TarnishCompiler::new(file_names);
+    match compiler.compile(){
+        Ok(_) => ExitCode::SUCCESS,
+        Err(e) =>{
+            println!("\nCompilation error:\n\n{}", e);
+            ExitCode::from(e.code())
+        }
+    }
+
+    /*let file_ll_name = convert_input_name_to_ll(&file_name);
     let file_o_name = convert_ll_name_to_o(&file_ll_name);
     let file_exe_name = convert_o_name_to_exe(&file_o_name);
     let file_contents = fs::read_to_string(&file_name).expect("Something went wrong reading the file");
@@ -139,5 +158,5 @@ fn main() {
     println!("Executing compiled program:\n");
     let final_return = Command::new(String::from("./") + &file_exe_name).output().expect("Program execution failed: ");
     println!("{}", &final_return.stdout.iter().map(|b| *b as char).collect::<String>());
-    println!("Process finished with exit code: {:?}", &final_return.status.code().unwrap());
+    println!("Process finished with exit code: {:?}", &final_return.status.code().unwrap());*/
 }
