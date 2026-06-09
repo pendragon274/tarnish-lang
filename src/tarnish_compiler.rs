@@ -43,7 +43,22 @@ impl TarnishCompiler{
         compile_results.clear();
         success = true;
         for file in &mut self.file_builds{
-            let result = file.llcompile();
+            let result = file.ll_compile();
+            
+            if result.is_err(){
+                success = false;
+                compile_results.push(result.err().unwrap());
+            }
+        }
+        
+        if !success{
+            return Err(CompileError::new(compile_results));
+        }
+        
+        compile_results.clear();
+        success = true;
+        for file in &mut self.file_builds{
+            let result = file.remove_ll();
             
             if result.is_err(){
                 success = false;

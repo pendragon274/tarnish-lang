@@ -6,8 +6,14 @@ pub struct CompileError{
 }
 
 pub struct FileCompileError{
-    line: Option<u64>,
+    line: Option<usize>,
     file: String,
+    message: String,
+    code: u8
+}
+
+pub struct CompileProcessorError{
+    line: Option<usize>,
     message: String,
     code: u8
 }
@@ -73,7 +79,34 @@ impl FileCompileError {
         self.code
     }
 
-    pub fn new(line: Option<u64>, file: String, message: String, code: u8) -> FileCompileError{
-        FileCompileError{ line, file, message, code }
+    pub fn new(new_line: Option<usize>, new_file: String, new_message: &str, new_code: u8) -> FileCompileError{
+        FileCompileError{ 
+            line: new_line,
+            file: new_file,
+            message: String::from(new_message),
+            code: new_code 
+        }
+    }
+}
+
+impl CompileProcessorError {
+    pub fn line(&self) -> Option<usize>{
+        self.line
+    }
+    
+    pub fn code(&self) -> u8{
+        self.code
+    }
+    
+    pub fn message(&self) -> String{
+        self.message.clone()
+    }
+    
+    pub fn new(new_line: Option<usize>, new_message: &str, new_code: u8) -> CompileProcessorError {
+        CompileProcessorError{
+            line: new_line,
+            message: String::from(new_message),
+            code: new_code
+        }
     }
 }

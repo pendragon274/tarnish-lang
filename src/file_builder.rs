@@ -1,11 +1,13 @@
-use std::fs;
+use std::{fs, usize};
 use std::process::Command;
-use crate::FileCompileError;
+use crate::{CompileProcessorError, FileCompileError};
+use crate::CompileProcessor;
 
 pub struct FileBuilder {
     filename: String,
     original_contents: Option<Vec<String>>,
-    processed_contents: Option<Vec<(String, usize)>>
+    processed_contents: Option<Vec<(String, usize)>>,
+    processor: CompileProcessor
 }
 
 impl FileBuilder {
@@ -15,14 +17,10 @@ impl FileBuilder {
         println!("\nCompiling {}...", name);
         let contents = match &self.original_contents {
             Some(text) => text.clone(),
-            None => return Err(FileCompileError::new(None, name, String::from("File not found."), 1))
+            None => return Err(FileCompileError::new(None, name, "File not found.", 1))
         };
 
-        let mut processed: Vec<(String, usize)> = Vec::new();
-        for (index, line) in contents.iter().enumerate(){
-            processed.push((line.clone(), index));
-        }
-        self.processed_contents = Some(processed);
+        self.process(contents)?;
 
         Ok(())
     }
@@ -32,24 +30,49 @@ impl FileBuilder {
             Some(contents) => {
                 let name = self.ll_name();
                 println!("\nWriting intermediate file {}...", name);
-                let write_result = fs::write(Self::working_directory() + &name, contents.iter().map(|(line, index)| line.clone()).collect::<Vec<String>>().join("\n"));
+                let write_result = fs::write(Self::working_directory() + &name, contents.iter().map(|(line, _index)| line.clone()).collect::<Vec<String>>().join("\n"));
                 match write_result {
                     Ok(_) => Ok(()),
-                    Err(_) => Err(FileCompileError::new(None, name, String::from("Unable to write to file."), 2))
+                    Err(_) => Err(FileCompileError::new(None, name, "Unable to write to file.", 2))
                 }
-            }, None => Err(FileCompileError::new(None, self.filename.clone(), String::from("File not compiled."), 3))
+            }, None => Err(FileCompileError::new(None, self.filename.clone(), "File not compiled.", 3))
         }
     }
 
-    pub fn llcompile(&mut self) -> Result<(), FileCompileError>{
+    pub fn remove_ll(&mut self) -> Result<(), FileCompileError>{
         if let Ok(exists) = fs::exists(Self::working_directory() + self.ll_name().as_str()){
-            if(!exists){
-                return Err(FileCompileError::new(None, self.filename.clone(), "Intermediate assembly file does not exist.".to_string(), 4));
+            if !exists{
+                return Err(FileCompileError::new(None, self.filename.clone(), "Intermediate assembly file does not exist.", 4));
             }
         }else{
-            return Err(FileCompileError::new(None, self.filename.clone(), "Could not interact with intermediate assembly file.".to_string(), 5));
+            return Err(FileCompileError::new(None, self.filename.clone(), "Could not interact with intermediate assembly file.", 5));
         }
 
+        println!("Removing intermediate assembly file {}...", self.ll_name());
+        let rm_output = Command::new("rm").args([self.ll_name().as_str()]).output();
+        match rm_output{
+            Ok(output) => {
+                if output.stderr.len() > 0{
+                    Err(self.extract_error(String::from_utf8(output.stderr).unwrap()))
+                }else{
+                    Ok(())
+                }
+            }, Err(_) => {
+                Err(FileCompileError::new(None, self.filename.clone(), "Could not execute the command to remove the intermediate assembly file.", 7))
+            }
+        }
+    }
+
+    pub fn ll_compile(&mut self) -> Result<(), FileCompileError>{
+        if let Ok(exists) = fs::exists(Self::working_directory() + self.ll_name().as_str()){
+            if !exists {
+                return Err(FileCompileError::new(None, self.filename.clone(), "Intermediate assembly file does not exist.", 4));
+            }
+        }else{
+            return Err(FileCompileError::new(None, self.filename.clone(), "Could not interact with intermediate assembly file.", 5));
+        }
+
+        println!("Compiling intermediate assembly file {}...", self.ll_name());
         let llc_output = Command::new("llc").args(["-filetype=obj", self.ll_name().as_str(), "-o", self.o_name().as_str()]).output();
         match llc_output{
             Ok(output) => {
@@ -60,7 +83,7 @@ impl FileBuilder {
                     Ok(())
                 }
             }, Err(_) => {
-                Err(FileCompileError::new(None, self.filename.clone(), "Could not execute the command to compile the intermediate assembly file.".to_string(), 7))
+                Err(FileCompileError::new(None, self.filename.clone(), "Could not execute the command to compile the intermediate assembly file.", 7))
             }
         }
     }
@@ -70,21 +93,36 @@ impl FileBuilder {
     }
 
     // ***** Private Functions *****
+    fn convert_result<T>(&self, result: Result<T, CompileProcessorError>) -> Result<T, FileCompileError>{
+        match result{
+            Ok(value) => Ok(value),
+            Err(e) => Err(FileCompileError::new(e.line(), self.filename.clone(), e.message().as_str(), e.code()))
+        }
+    }
+
+    fn process(&mut self, contents: Vec<String>) -> Result<(), FileCompileError>{
+        let input_result = self.processor.input(contents);
+        self.convert_result(input_result)?;
+        let output_result = self.processor.output();
+        self.processed_contents = Some(self.convert_result(output_result)?);
+
+        Ok(())
+    }
+
     fn extract_error(&self, stderr_output: String) -> FileCompileError{
         let line_info_location = stderr_output.find(&(self.ll_name() + ":"));
         match line_info_location{
-            None => FileCompileError::new(None, self.filename.clone(), "Unknown intermediate assembly compile error: ".to_string() + &stderr_output, 6),
+            None => FileCompileError::new(None, self.filename.clone(), ("Unknown intermediate assembly compile error: ".to_string() + &stderr_output).as_str(), 6),
             Some(index) => {
-                let mut slice = &stderr_output[(index + self.ll_name().len() + 1)..];
+                let slice = &stderr_output[(index + self.ll_name().len() + 1)..];
                 //println!("The original slice: {}", slice.to_string());
                 let next_find = slice.find(":");
                 match next_find{
-                    None => FileCompileError::new(None, self.filename.clone(), "Unknown line number interpretation from intermediate asembly compile error: ".to_string() + &stderr_output, 8),
+                    None => FileCompileError::new(None, self.filename.clone(), ("Unknown line number interpretation from intermediate asembly compile error: ".to_string() + &stderr_output).as_str(), 8),
                     Some(end_index) => {
-                        //println!("The slice to extract line number from: {}", slice[..end_index].to_string());
-                        let line_number = u32::from(slice[..end_index].parse::<u32>().unwrap());
+                        let line_number = usize::from(slice[..end_index].parse::<usize>().unwrap());
                         let end = slice.rfind(":").unwrap();
-                        FileCompileError::new(Some(line_number as u64), self.filename.clone(), slice[end + 1..].to_string(), 9)
+                        FileCompileError::new(Some(line_number), self.filename.clone(), slice[end + 1..].to_string().as_str(), 9)
                     }
                 }
             }
@@ -120,13 +158,15 @@ impl FileBuilder {
                 FileBuilder {
                     filename: new_filename.clone(),
                     original_contents: Some(contents.split('\n').map(|s| s.to_string()).collect()),
-                    processed_contents: None
+                    processed_contents: None,
+                    processor: CompileProcessor::new()
                 }
             }, Err(_) => {
                 FileBuilder{
                     filename: new_filename,
                     original_contents: None,
-                    processed_contents: None
+                    processed_contents: None,
+                    processor: CompileProcessor::new()
                 }
             }
         }
