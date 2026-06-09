@@ -103,7 +103,7 @@ fn main() -> ExitCode {
     match compiler.compile(){
         Ok(_) => ExitCode::SUCCESS,
         Err(e) =>{
-            println!("\nCompilation error:\n\n{}", e);
+            println!("{}", e);
             ExitCode::from(e.code())
         }
     }

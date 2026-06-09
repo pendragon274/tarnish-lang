@@ -8,7 +8,7 @@ pub struct TarnishCompiler{
 
 impl TarnishCompiler{
     pub fn compile(&mut self) -> Result<(), CompileError>{
-        println!("\n\nCompiling files: {:?}", self.file_names_list());
+        println!("\nCompiling files: {:?}", self.file_names_list());
 
         let mut compile_results: Vec<FileCompileError> = Vec::new();
         let mut success = true;
@@ -21,6 +21,36 @@ impl TarnishCompiler{
             }
         }
 
+        if !success{
+            return Err(CompileError::new(compile_results));
+        }
+
+        compile_results.clear();
+        success = true;
+        for file in &mut self.file_builds{
+            let result = file.write_ll();
+
+            if result.is_err(){
+                success = false;
+                compile_results.push(result.err().unwrap());
+            }
+        }
+
+        if !success{
+            return Err(CompileError::new(compile_results));
+        }
+        
+        compile_results.clear();
+        success = true;
+        for file in &mut self.file_builds{
+            let result = file.llcompile();
+            
+            if result.is_err(){
+                success = false;
+                compile_results.push(result.err().unwrap());
+            }
+        }
+        
         if !success{
             return Err(CompileError::new(compile_results));
         }

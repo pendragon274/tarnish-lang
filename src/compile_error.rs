@@ -6,7 +6,7 @@ pub struct CompileError{
 }
 
 pub struct FileCompileError{
-    line: u64,
+    line: Option<u64>,
     file: String,
     message: String,
     code: u8
@@ -27,7 +27,10 @@ impl Debug for CompileError {
 
 impl Debug for FileCompileError {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "File {}, Code {}, Line {}: {}", self.file, self.code, self.line, self.message)
+        match self.line {
+            Some(line) => write!(f, "File {}, Code {}, Line {}: {}", self.file, self.code, line, self.message),
+            None => write!(f, "File {}, Code {}: {}", self.file, self.code, self.message)
+        }
     }
 }
 
@@ -45,7 +48,10 @@ impl Display for CompileError{
 
 impl Display for FileCompileError {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "File {}, Line {}: {}", self.file, self.line, self.message)
+        match self.line {
+            Some(line) => write!(f, "File {}, Line {}: {}", self.file, line, self.message),
+            None => write!(f, "File {}: {}", self.file, self.message)
+        }
     }
 }
 
@@ -67,7 +73,7 @@ impl FileCompileError {
         self.code
     }
 
-    pub fn new(line: u64, file: String, message: String, code: u8) -> FileCompileError{
+    pub fn new(line: Option<u64>, file: String, message: String, code: u8) -> FileCompileError{
         FileCompileError{ line, file, message, code }
     }
 }
